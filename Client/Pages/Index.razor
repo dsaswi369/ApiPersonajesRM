@@ -1,0 +1,102 @@
+﻿@page "/"
+@using ApiPersonajesRM.Shared.Models;
+@using Newtonsoft.Json;
+@inject HttpClient client
+
+<PageTitle>Index</PageTitle>
+<h1>Rick y Morty Personajes</h1>
+
+<input type="text" @bind="searchTerm" placeholder="Buscar por nombre..." class="form-control mt-3" />
+
+@if (characters is null)
+{
+    <p>Empty</p>
+}
+else if (filteredCharacters.Count == 0)
+{
+    <p>No hay datos</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var character in filteredCharacters)
+        {
+            <div class="col mt-3">
+                <div class="card">
+                    <img src="@character.image" class="card-img-top" alt="No image" />
+
+                    <div class="card-body">
+                        <p class="card-text"><strong>@character.name</strong></p>
+                        <p class="card-text">@character.origin</p>
+                        <p class="card-text">@character.location.name</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mt-5">
+        <nav aria-label="Page navigation example">
+            <div style="text-align:center">
+                Page @Page of @characters.info.pages
+                <strong>
+                    Items @(filteredCharacters.Count * Page)
+                </strong> of  <strong>@(characters.info.count)</strong>
+            </div>
+
+            <ul class="pagination">
+                <li class="page-item @(Page == 1 ? " disabled " : "")"><a class="page-link" @onclick="@(() => OnPage(Page-1))">Previous</a></li>
+
+                <li class="page-item @(Page == characters.info.pages ? " disabled " : "")"><a class="page-link" @onclick="@(() => OnPage(Page+1))">Next</a></li>
+            </ul>
+        </nav>
+    </div>
+}
+
+@code {
+    public Characters characters { get; set; } = null;
+
+    public int Page { get; set; }
+    public int Total { get; set; }
+    public string searchTerm { get; set; } = string.Empty;
+
+    private List<Character> filteredCharacters =>
+        string.IsNullOrWhiteSpace(searchTerm) ? characters.results :
+        characters.results.Where(c => c.name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    protected override Task OnInitializedAsync()
+    {
+        Page = 1;
+        GetCharacters();
+        return base.OnInitializedAsync();
+    }
+
+    private void OnPage(int page)
+    {
+        Page = page;
+        GetCharacters();
+    }
+
+    private async void GetCharacters()
+    {
+        try
+        {
+            var response = await client.GetAsync($"api/characters/all?page={Page}");
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                characters = JsonConvert.DeserializeObject<Characters>(responseBody);
+
+                Total = characters.info.count;
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Total = 0;
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
+
